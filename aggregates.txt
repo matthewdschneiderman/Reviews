@@ -1,0 +1,165 @@
+db.reviews.aggregate(
+  [
+    {$lookup: {"from":"photos", "localField":"id", "foreignField":"review_id", "as":"photos"}},
+    {"$project": {"photos.review_id": 0,}},
+    {"$out": "reviewCollect"}
+  ])
+  //Do not use... use one below//
+
+db.reviews.aggregate(
+  [
+    {$lookup: {"from":"photos", "localField":"id", "foreignField":"review_id", "as":"photos"}},
+    {"$project": {"photos.review_id": 0, "photos._id": 0}},
+    {"$out": "photoChange"}
+  ])
+
+db.characteristics_reviews.aggregate([
+   {"$lookup": { 
+         "from": "characteristics", 
+         "localField": "characteristic_id", 
+         "foreignField": "id", 
+         "as": "newCharacteristics" 
+         }}, 
+   { "$replaceRoot": { "newRoot": { "$mergeObjects": [ 
+      { "$arrayElemAt": [ "$newCharacteristics", 0 ] }, "$$ROOT"] }}
+   }, 
+   { "$project": { "newCharacteristics": 0 } }, 
+   {"$out": "charObjs"}])
+
+   //////////////////////////////////////////////////////
+  db.characteristicsComb.aggregate([
+     { "$group": {"_id": "$review_id", characteristics: {"name": "$name", "value": "$value"}}},
+     {"$out": "newCharacteristics"}
+  ]) ////////////////////////////////////////////////////////////////////////
+
+db.lastChar.update({"name": "Fit" }, 
+[{$set : {"Fit": {id: "$characteristic_id", value: "$value"}}}], 
+{upsert: false, multi: true})
+db.lastChar.update({"name": "Length" }, [{$set : {"Length": {id: "$characteristic_id", value: "$value"}}}], {upsert: false, multi: true})
+db.lastChar.update({"name": "Comfort" }, [{$set : {"Comfort": {id: "$characteristic_id", value: "$value"}}}], {upsert: false, multi: true})
+db.lastChar.update({"name": "Size" }, [{$set : {"Size": {id: "$characteristic_id", value: "$value"}}}], {upsert: false, multi: true})
+db.lastChar.update({"name": "Width" }, [{$set : {"Width": {id: "$characteristic_id", value: "$value"}}}], {upsert: false, multi: true})
+db.lastChar.update({"name": "Quality" }, [{$set : {"Quality": {id: "$characteristic_id", value: "$value"}}}], {upsert: false, multi: true})
+
+
+db.characteristicsComb.update({"name": "Fit" }, [{$set : {"Characteristics": {Fit: "$Fit"}}}], {upsert: false, multi: true})
+db.characteristicsComb.update({"name": "Length" }, [{$set : {"Characteristics": {Length: "$Length"}}}], {upsert: false, multi: true})
+db.characteristicsComb.update({"name": "Comfort" }, [{$set : {"Characteristics": {Comfort: "$Comfort"}}}], {upsert: false, multi: true})
+db.characteristicsComb.update({"name": "Size" }, [{$set : {"Characteristics": {Size: "$Size"}}}], {upsert: false, multi: true})
+db.characteristicsComb.update({"name": "Width" }, [{$set : {"Characteristics": {Width: "$Width"}}}], {upsert: false, multi: true})
+db.characteristicsComb.update({"name": "Quality" }, [{$set : {"Characteristics": {Quality: "$Quality"}}}], {upsert: false, multi: true})
+
+db.characteristicsComb.aggregate([{$group: { _id: "$product_id", Characteristics: {$mergeObjects: "$Characteristics"}}}, {$out: "productCharacteristics"}], { allowDiskUse: true })
+
+
+db.characteristicsComb.aggregate([{$group: { _id: "$product_id", Fit: "$Fit", Length: "$Length", Comfort: "$Comfort", Size: "$Size", Width: "$Width", Quality: "$Quality"}, {$out: "justChars"}];
+
+   {
+      "$replaceRoot": { "newRoot": { "$mergeObjects": [ { "$arrayElemAt": [ "$newCharacteristics", 0 ] }, "$$ROOT" ] } }
+   },
+
+   "newCharacteristics": 0, "lastChar._id": 0, "lastChar.id": 0, "lastChar.product_id": 0, "lastChar.name": 0, "lastChar.characteristic_id": 0, "lastChar.value": 0}
+   
+db.photoChange.aggregate([
+   {
+      "$lookup": {
+         "from": "lastChar",
+         "localField": "review_id",
+         "foreignField": "review_id",
+         "as": "newCharacteristics"
+      }
+   },
+   { "$project": { "newCharacteristics": 0, "lastChar._id": 0, "lastChar.id": 0, 
+         "lastChar.product_id": 0, "lastChar.name": 0, "lastChar.characteristic_id": 0, 
+         "lastChar.value": 0} },
+   {"$out": "end"}
+])
+
+
+db["photoChange"].updateMany( {}, { $rename: { "id": "review_id" } } )
+
+
+db["newfinal"].updateMany( {}, { $rename: { "Characteristics": "characteristics" } } )
+
+
+db.lastChar.aggregate([
+   {
+      "$project": { "id": 0, "name": 0, "characteristic_id": 0, "value": 0}
+   }, 
+   {
+      "$out": "characteristicsChange"
+   }
+])
+
+
+db.characteristicsChange.aggregate([
+   { 
+      "$group": {"_id": "$review_id", "newVals": {"product_id": "$product_id", "name": "$name", "value": "$value"}}
+   }, 
+   { 
+      "$replaceRoot": { "newRoot": { "$mergeObjects": [ { "$arrayElemAt": [ "$newVals", 0 ] }, "$$ROOT" ] } }
+   },
+   {
+   "$out": "combiningChars"
+   }
+])
+     db.characteristicsChange.aggregate([
+        {
+           "$out": "combiningChars"
+         }
+     ])
+
+
+db.photoChange.aggregate([
+   {
+      "$lookup": {
+         "from": "characteristicsChange",
+         "localField": "review_id",
+         "foreignField": "review_id",
+         "as": "newCharacteristics"
+      }
+   },
+   {
+      "$replaceRoot": { "newRoot": { "$mergeObjects": [ { "$arrayElemAt": [ "$newCharacteristics", 0 ] }, "$$ROOT" ] } }
+   },
+   { "$project": { "newCharacteristics": 0} },
+   {"$out": "charWork"}
+], { allowDiskUse: true })
+  
+  
+
+  db.combiningChars.ensureIndex({'review_id' : 1}, {unique : true, dropDups : true})
+  
+db.combiningChars.aggregate([{$group:{_id:"$review_id", dups:{$push:"$_id"}, count: {$sum: 1}}},
+{$match:{count: {$gt: 1}}}
+], { allowDiskUse: true }).forEach(function(doc){
+  doc.dups.shift();
+  db.dups.remove({_id : {$in: doc.dups}});
+});
+
+
+db.photoChange.aggregate([
+   {
+      "$lookup": {
+         "from": "characteristicsChange",
+         "localField": "review_id",
+         "foreignField": "review_id",
+         "as": "newCharacteristics"
+      }
+   },
+   {"$out": "charWork"}
+], { allowDiskUse: true })
+
+db.photoChange.aggregate([
+   {
+      "$lookup": {
+         "from": "charObjs",
+         "localField": "review_id",
+         "foreignField": "review_id",
+         "as": "Chars"
+      }
+   },
+   { "$project": {"Chars._id": 0, "Chars.id": 0, "Chars.product_id": 0, "Chars.review_id": 0} },
+   {"$out": "completedETL"}
+])
+
