@@ -3,8 +3,9 @@ let app = express();
 let bodyParser = require('body-parser');
 let { retrieve, retrieveChar } = require('../database');
 let _ = require('lodash');
+const dotenv = require('dotenv').config();
 
-let port = 5000;
+let port = process.env.PORT || 6050;
 
 app.listen(port, function () {
   console.log(`listening on port ${port}`);

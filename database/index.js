@@ -1,5 +1,8 @@
 const mongoose = require('mongoose');
-mongoose.connect('mongodb://localhost/sdc', { useNewUrlParser: true });
+const dotenv = require('dotenv').config();
+mongoose.connect(process.env.MONGO_URL, { useNewUrlParser: true });
+
+// console.log('here', process.env.MONGO_URL);
 
 const db = mongoose.connection;
 db.on('error', console.error.bind(console, 'connection error:'));
